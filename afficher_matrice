@@ -39,5 +39,5 @@ def afficher_matrice(matrice, titre="Matrice d'adjacence"):
             else:
                 print(f"  {valeur:3}  ", end="")
         print()
-    print(f"{'='*50}\n")
+    
     print(f"{'='*50}\n")
