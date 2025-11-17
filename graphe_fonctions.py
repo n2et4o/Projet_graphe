@@ -93,3 +93,47 @@ while True:
         continue
 
     afficher_chemin(s, t, L, P)
+
+
+def afficher_matrice(matrice, titre="Matrice d'adjacence"):
+    # Gérer différents formats d'entrée
+    if isinstance(matrice, dict):
+        if 'matrice' in matrice:
+            mat = matrice['matrice']
+            n = matrice.get('n', len(mat))
+        elif 'C' in matrice:
+            mat = matrice['C']
+            n = matrice.get('n', len(mat))
+        else:
+            mat = matrice
+            n = len(mat)
+    else:
+        mat = matrice
+        n = len(mat)
+
+    # Affichage du titre
+    print(f"\n{'=' * 50}")
+    print(f"{titre}")
+    print(f"{'=' * 50}")
+
+    # En-tête des colonnes
+    print("     ", end="")
+    for j in range(n):
+        print(f"  [{j}]  ", end="")
+    print()
+    print("     " + "-" * (n * 8))
+
+    # Affichage de chaque ligne
+    for i in range(n):
+        print(f"[{i}] |", end="")
+        for j in range(n):
+            valeur = mat[i][j]
+
+            # Gestion des différentes représentations de l'infini
+            if valeur is None or valeur == float('inf') or (isinstance(valeur, (int, float)) and valeur >= 999999):
+                print("  INF  ", end="")
+            else:
+                print(f"  {valeur:3}  ", end="")
+        print()
+
+    print(f"{'=' * 50}\n")
