@@ -1,9 +1,12 @@
+from fileinput import filename
+
 import pygame
 import time
 import random
 import io, contextlib
 import sys, os #pour intérargir avec syst d'exploitation - manipuler les répertoires et fichiers
 import re, pygame  # Importation du module pour manipuler les expressions régulières
+from graphe_fonctions import *
 
 
 # Initialisation de Pygame
@@ -61,9 +64,6 @@ class State:
         self.current_mode = self.default_mode
         self.current_background_color = MODES[self.current_mode]["background"]
         self.text_color = MODES[self.current_mode]["text"]
-        self.choosing_floydification  = False  #  Ajout du flag pour le sous-menu transformation
-        self.menu_type = "transform"  # Par défaut, affichage du menu de transformation
-        self.graphe_floydifie  = None # Ajout d'un attribut pour stocker du graphe transformé
         self.running = True
 
 
@@ -92,7 +92,6 @@ def draw_menu(screen,state):
 
     pygame.display.flip()
 
-
 def draw_help(screen, state):
     screen.fill(state.current_background_color)
 
@@ -118,7 +117,6 @@ def draw_help(screen, state):
 
     pygame.display.flip()
 
-
 def render_text_multiline(text, font, color, max_width):
     #Découpe un texte trop long en plusieurs lignes.
 
@@ -141,7 +139,7 @@ def render_text_multiline(text, font, color, max_width):
 
 def draw_input_box(screen, state):
     # Liste dynamique des fichiers .txt dans le dossier graphes_Projet
-    dossier = "graphe_projet"
+    dossier = "graphes_tests"
     fichiers = [f for f in os.listdir(dossier) if f.endswith(".txt")]
     fichiers.sort()  # Optionnel : trie les fichiers
     total = len(fichiers)
@@ -149,8 +147,8 @@ def draw_input_box(screen, state):
     # Affichage de l'instruction dynamique
     screen.fill(state.current_background_color)
     if total > 0:
-        text = f"Entrez un numéro entre 1 et {total}:"
-    elif total > 44:
+        text = f"Entrez un numéro entre 0 et {total}:"
+    elif total > 13:
         text = f"Le(s) fichier(s) que vous avez creer commence à partir de 0.\n Entrez un numéro entre 1 et {total}:"
     else:
         text = "Aucun fichier .txt trouvé dans graphes_Projet"
@@ -177,6 +175,13 @@ def draw_graphe_menu(screen,state):
 
     pygame.display.flip()
 
+def print_f(func, *args, **kwargs):
+    #Capture tout ce que la fonction affiche via print() et le retourne.
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        func(*args, **kwargs)
+    return output.getvalue().strip()
+
 def draw_options_menu(screen,state):
     screen.fill(state.current_background_color)
     title = font.render("Choisir un Mode:", True, state.text_color)
@@ -188,3 +193,420 @@ def draw_options_menu(screen,state):
         screen.blit(text, (WIDTH // 2 - text.get_width() // 2, 200 + i * 60))
 
     pygame.display.flip()
+
+def afficher_graphe_pygame(screen, n, m, arcs, matrice, nb):
+    """
+    Affiche les informations du graphe (n, m, arcs + matrice)
+    avec défilement vertical/horizontal.
+    Quitter : ENTER ou ESC
+    """
+
+    font = pygame.font.SysFont("consolas", 22)
+
+    # Offsets pour le défilement
+    x_offset = 0
+    y_offset = 0
+
+    base_x = 20
+    base_y = 20
+
+    clock = pygame.time.Clock()
+    running = True
+
+    # ============================================================
+    # Convertir la matrice en lignes de texte (IMPORTANT)
+    # ============================================================
+    texte_matrice = afficher_matrice_text(matrice, "Matrice des valeurs")
+    lignes_matrice = texte_matrice.split("\n")
+
+    while running:
+
+        # ------------------ ÉVÉNEMENTS ------------------
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+                    running = False
+
+                elif event.key == pygame.K_DOWN:
+                    y_offset -= 20     # vers le bas
+                elif event.key == pygame.K_UP:
+                    y_offset += 20
+                    y_offset = min(y_offset, 0)     # vers le haut
+                elif event.key == pygame.K_RIGHT:
+                    x_offset += 20     # droite
+                elif event.key == pygame.K_LEFT:
+                    x_offset = max(0, x_offset - 20)    # gauche
+
+        # ------------------ AFFICHAGE ------------------
+        screen.fill((0, 0, 0))
+
+        x = base_x + x_offset
+        y = base_y + y_offset
+
+        # ---- TITRE ----
+        screen.blit(font.render(f"Graphe n°{nb}", True, (255, 255, 0)), (x, y))
+        y += 40
+
+        # ---- INFOS ----
+        screen.blit(font.render(f"Nombre de sommets : {n}", True, (255, 255, 255)), (x, y))
+        y += 30
+
+        screen.blit(font.render(f"Nombre d'arcs : {m}", True, (255, 255, 255)), (x, y))
+        y += 40
+
+        # ---- LISTE DES ARCS ----
+        screen.blit(font.render("Liste des arcs :", True, (0, 200, 255)), (x, y))
+        y += 30
+
+        for (u, v, poids) in arcs:
+            screen.blit(font.render(f"{u} -> {v} : {poids}", True, (200, 200, 200)), (x, y))
+            y += 25
+
+        y += 30
+
+        # ---- MATRICE FORMATTÉE ----
+        for ligne in lignes_matrice:
+            screen.blit(font.render(ligne, True, (180, 180, 180)), (x, y))
+            y += 25
+
+        pygame.display.flip()
+        clock.tick(60)
+
+def afficher_floyd_pygame(screen, historique, has_cycle):
+    font = pygame.font.SysFont("consolas", 22)
+    running = True
+
+    index = 0           # index de l’étape affichée
+    y_offset = 0        # scroll vertical
+
+    go = False          # True => on affiche le message d’erreur
+    # (et on n'affiche plus les matrices)
+
+    while running:
+
+        # ---------- 1) GESTION DES ÉVÉNEMENTS AVANT LE DESSIN ----------
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.KEYDOWN:
+
+                # ESC
+                if event.key == pygame.K_ESCAPE:
+                    if has_cycle:
+                        # 1er ESC : afficher le message
+                        if not go:
+                            go = True
+                        # 2ᵉ ESC : quitter
+                        else:
+                            running = False
+                    else:
+                        # pas de circuit → ESC quitte directement
+                        running = False
+
+                # Navigation seulement si on n'est PAS en mode message d'erreur
+                elif not (has_cycle and go):
+
+                    # Étape suivante
+                    if event.key == pygame.K_RIGHT:
+                        index = min(index + 1, len(historique) - 1)
+                        y_offset = 0
+
+                    # Étape précédente
+                    elif event.key == pygame.K_LEFT:
+                        index = max(index - 1, 0)
+                        y_offset = 0
+
+                    # Aller à la dernière étape
+                    elif event.key == pygame.K_l:
+                        index = len(historique) - 1
+                        y_offset = 0
+
+                    # Scroll bas/haut (page)
+                    elif event.key == pygame.K_DOWN:
+                        y_offset -= 40
+                    elif event.key == pygame.K_UP:
+                        y_offset += 40
+                        y_offset = min(y_offset, 0)
+
+        # Si on a demandé de quitter dans les events
+        if not running:
+            break
+
+        # ---------- 2) DESSIN DE L'ÉCRAN ----------
+        screen.fill((0, 0, 0))
+
+        y = 20 + y_offset
+
+        # Ligne info
+        info = font.render(
+            f"Étape {index + 1}/{len(historique)}  |  ←/→ étapes  |  L dernière  |  ESC quitter",
+            True, (200, 200, 0)
+        )
+        screen.blit(info, (20, 10))
+        y = 50 + y_offset
+
+        # --- MODE "MESSAGE D'ERREUR" SI CIRCUIT ABSORBANT ---
+        if has_cycle and go:
+            msg = "Impossible d'afficher les chemins : circuit absorbant détecté."
+            for ligne in msg.split("\n"):
+                text = font.render(ligne, True, (255, 100, 100))
+                screen.blit(text, (20, y))
+                y += 35
+
+        # --- MODE NORMAL : AFFICHAGE DES MATRICES ---
+        else:
+            etape_texte = historique[index]
+            lignes = etape_texte.split("\n")
+            for ligne in lignes:
+                text = font.render(ligne, True, (255, 255, 255))
+                screen.blit(text, (20, y))
+                y += 25
+
+        pygame.display.flip()
+
+def floyd(C):
+    n = len(C)
+    # Copie initiale de C dans L
+    L = [[C[i][j] for j in range(n)] for i in range(n)]
+
+    historique = []  # <<=== IMPORTANT
+
+    # Matrice des prédécesseurs P
+    P = [[-1 for _ in range(n)] for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            if i != j and C[i][j] != INF:
+                P[i][j] = i
+
+    # Ajouter l’état initial (L + P ensemble)
+    texte = ""
+    texte += afficher_matrice_text(L, "L (initial)") + "\n\n"
+    texte += afficher_matrice_text(P, "P (initial)")
+    historique.append(texte)
+
+    # État initial
+    afficher_matrice(L, "L (initial)")
+    afficher_matrice(P, "P (initial)")
+
+    has_cycle = False
+
+    # Triple boucle de Floyd
+    for k in range(n):
+        for i in range(n):
+            if L[i][k] == INF:
+                continue
+            for j in range(n):
+                if L[k][j] == INF:
+                    continue
+
+                cand = L[i][k] + L[k][j]
+                if cand < L[i][j]:
+                    L[i][j] = cand
+                    P[i][j] = P[k][j]
+
+        # Affichage intermédiaire après ce k
+        afficher_matrice(L, f"L après k = {k}")
+        afficher_matrice(P, f"P après k = {k}")
+
+        # Ajouter L + P pour cette étape
+        texte = ""
+        texte += f"Étape k = {k}\n"
+        texte += afficher_matrice_text(L, f"L après k = {k}") + "\n\n"
+        texte += afficher_matrice_text(P, f"P après k = {k}")
+        historique.append(texte)
+
+        # On regarde si un circuit absorbant apparaît
+        for i in range(n):
+            if L[i][i] < 0:
+                has_cycle = True
+
+    if has_cycle:
+        print("\n Circuit absorbant détecté dans le graphe.")
+    else:
+        print("\n Aucun circuit absorbant détecté.")
+
+    return historique, L, P, has_cycle
+
+def afficher_matrice_text(M, titre):
+    lignes = []
+    n = len(M)
+
+    # Largeur d'une cellule (vraiment important)
+    W = 6
+
+    # Barres horizontales
+    lignes.append("=" * (10 + W * n))
+    lignes.append(titre)
+    lignes.append("=" * (10 + W * n))
+
+    # En-têtes
+    header = "      " + "".join(f"[{j}]".center(W) for j in range(n))
+    lignes.append(header)
+
+    lignes.append("      " + "-" * (W * n))
+
+    # Lignes du tableau
+    for i in range(n):
+        row = f"[{i}] | "
+        for j in range(n):
+            val = "INF" if M[i][j] >= 999999 else str(M[i][j])
+            row += val.center(W)
+        lignes.append(row)
+
+    lignes.append("=" * (10 + W * n))
+    return "\n".join(lignes)
+
+def interface_chemins_pygame(screen, L, P,chemins_log):
+    font = pygame.font.SysFont("consolas", 28)
+
+    phase = 0           # 0 = saisie départ, 1 = saisie arrivée, 2 = affichage résultat
+    saisie = ""
+    s = None
+    t = None
+    resultat_texte = []
+
+    running = True
+    while running:
+        screen.fill((0, 0, 0))
+
+        # --- PHASE 0 : saisie départ ---
+        if phase == 0:
+            screen.blit(font.render("Sommet de DÉPART (ENTER pour valider)", True, (255,255,0)), (20, 20))
+            screen.blit(font.render(f"0 .. {len(L)-1}", True, (255,255,255)), (20, 60))
+            screen.blit(font.render(saisie, True, (100,200,255)), (20, 120))
+
+        # --- PHASE 1 : saisie arrivée ---
+        elif phase == 1:
+            screen.blit(font.render("Sommet d’ARRIVÉE (ENTER pour valider)", True, (255,255,0)), (20, 20))
+            screen.blit(font.render(f"0 .. {len(L)-1}", True, (255,255,255)), (20, 60))
+            screen.blit(font.render(saisie, True, (100,200,255)), (20, 120))
+
+        # --- PHASE 2 : affichage résultat ---
+        elif phase == 2:
+            y = 20
+            for ligne in resultat_texte:
+                screen.blit(font.render(ligne, True, (255,255,255)), (20, y))
+                y += 35
+
+            screen.blit(font.render("ENTER : nouveau chemin | ESC : quitter", True, (200,200,0)), (20, y + 20))
+
+        pygame.display.flip()
+
+
+
+        # ----------------- GESTION CLAVIER -----------------
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.KEYDOWN:
+
+                # Quitter
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+                # Effacer caractère
+                elif event.key == pygame.K_BACKSPACE:
+                    saisie = saisie[:-1]
+
+                # Valider
+                elif event.key == pygame.K_RETURN:
+
+                    # --- Phase 0 : valider départ ---
+                    if phase == 0:
+                        if saisie.isdigit():
+                            s = int(saisie)
+                            if 0 <= s < len(L):
+                                saisie = ""
+                                phase = 1
+                            else:
+                                saisie = ""
+
+                    # --- Phase 1 : valider arrivée ---
+                    elif phase == 1:
+                        if saisie.isdigit():
+                            t = int(saisie)
+                            if 0 <= t < len(L):
+
+                                # --- Récupération via print_f ---
+                                texte = print_f(afficher_chemin, s, t, L, P)
+                                resultat_texte = texte.split("\n")
+                                chemins_log.append(texte)
+                                phase = 2
+                                saisie = ""
+                            else:
+                                saisie = ""
+
+                    # --- Phase 2 : recommencer ---
+                    elif phase == 2:
+                        phase = 0
+                        saisie = ""
+                        resultat_texte = []
+
+                # Ajouter chiffre
+                else:
+                    if event.unicode.isdigit():
+                        saisie += event.unicode
+
+def trace_execution_floyd(numero_graphe, n, m, arcs, matrice, historique, chemins_log):
+    """
+    Enregistre dans un fichier texte :
+        - le graphe initial (n, m, arcs, matrice)
+        - toutes les étapes de Floyd (L et P)
+        - les chemins calculés par l'utilisateur
+    """
+
+    # ========= 1) Création dossier ===========
+    dossier = "Trace_Floyd"
+    os.makedirs(dossier, exist_ok=True)
+
+    # Nom du fichier
+    filename = os.path.join(dossier, f"Graphe_{numero_graphe}_trace.txt")
+
+    # ========= 2) Construction du texte du graphe (intégré ici) ===========
+    lignes = []
+    lignes.append(f"Graphe n°{numero_graphe}")
+    lignes.append(f"Nombre de sommets : {n}")
+    lignes.append(f"Nombre d'arcs : {m}")
+    lignes.append("")
+
+    lignes.append("Liste des arcs :")
+    for (u, v, poids) in arcs:
+        lignes.append(f"  {u} -> {v} : {poids}")
+    lignes.append("")
+
+    # Matrice initiale
+    lignes.append(afficher_matrice_text(matrice, "Matrice initiale"))
+
+    graphe_log = "\n".join(lignes)
+
+    # ========= 3) Écriture dans le fichier ===========
+    with open(filename, "w", encoding="utf-8") as f:
+
+        # --- GRAPHE INITIAL ---
+        f.write("===== GRAPHE INITIAL =====\n")
+        f.write(graphe_log + "\n\n")
+
+        # --- ETAPES DE FLOYD ---
+        f.write("===== ETAPES DE FLOYD =====\n")
+        for i, etape in enumerate(historique):
+            f.write(f"\n--- Étape {i} ---\n")
+            f.write(etape + "\n")
+
+        # --- CHEMINS ---
+        f.write("\n===== CHEMINS CALCULES =====\n")
+        if chemins_log:
+            for ligne in chemins_log:
+                f.write(ligne + "\n")
+        else:
+            f.write("Aucun chemin demandé.\n")
+
+    print(f"Trace enregistrée dans : {filename}")

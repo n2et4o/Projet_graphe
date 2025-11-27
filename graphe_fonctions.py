@@ -1,5 +1,5 @@
-INF = 10**9
 
+INF = 10**9
 
 def lire_graphe(path):
     """
@@ -55,6 +55,11 @@ def lire_graphe(path):
         print("Erreur : le nombre d'arcs 'm' ne peut pas être négatif.")
         exit(1)
 
+     # AJOUT : afficher n et m
+    print(f"Nombre de sommets : {n}")
+    print(f"Nombre d'arcs : {m}")
+    print("Liste des arcs :")
+
     # Vérifier qu'il y a suffisamment de lignes pour les arcs
     if len(lignes_nettoyees) < 2 + m:
         print(
@@ -71,6 +76,8 @@ def lire_graphe(path):
             else:
                 ligne_matrice.append(INF)  # Arc absent = INF
         matrice.append(ligne_matrice)
+    # juste avant la boucle for idx in range(m):
+    arcs = []
 
     # Lire chaque arc
     for idx in range(m):
@@ -97,60 +104,17 @@ def lire_graphe(path):
             print(f"Erreur : sommets hors limites (n={n}) dans l'arc '{ligne}'.")
             exit(1)
 
+        arcs.append((u, v, poids))
+        # AJOUT : afficher l’arc sous la forme demandée
+        print(f"{u} -> {v} : {poids}")
+
         # Mettre à jour la matrice
         matrice[u][v] = poids
 
-    return matrice, n
+    return matrice, n, m, arcs
 
+#===================================
 
-def floyd(C):
-    n = len(C)
-
-    # Copie initiale de C dans L
-    L = [[C[i][j] for j in range(n)] for i in range(n)]
-
-    # Matrice des prédécesseurs P
-    P = [[-1 for _ in range(n)] for _ in range(n)]
-    for i in range(n):
-        for j in range(n):
-            if i != j and C[i][j] != INF:
-                P[i][j] = i
-
-    # État initial
-    afficher_matrice(L, "L (initial)")
-    afficher_matrice(P, "P (initial)")
-
-    has_cycle = False
-
-    # Triple boucle de Floyd
-    for k in range(n):
-        for i in range(n):
-            if L[i][k] == INF:
-                continue
-            for j in range(n):
-                if L[k][j] == INF:
-                    continue
-
-                cand = L[i][k] + L[k][j]
-                if cand < L[i][j]:
-                    L[i][j] = cand
-                    P[i][j] = P[k][j]
-
-        # Affichage intermédiaire après ce k
-        afficher_matrice(L, f"L après k = {k}")
-        afficher_matrice(P, f"P après k = {k}")
-
-        # On regarde si un circuit absorbant apparaît
-        for i in range(n):
-            if L[i][i] < 0:
-                has_cycle = True
-
-    if has_cycle:
-        print("\n Circuit absorbant détecté dans le graphe.")
-    else:
-        print("\n Aucun circuit absorbant détecté.")
-
-    return L, P, has_cycle
 
 def interface_chemins(L, P):
     n = len(L)
@@ -207,7 +171,7 @@ def afficher_chemin(s, t, L, P):
 
 # ========================= Amine's parts ===========================
 
-def afficher_matrice(matrice, titre="Matrice d'adjacence"):
+def afficher_matrice(matrice, titre="Matrice de valeurs"):
     # Gérer différents formats d'entrée
     if isinstance(matrice, dict):
         if 'matrice' in matrice:
@@ -249,3 +213,5 @@ def afficher_matrice(matrice, titre="Matrice d'adjacence"):
         print()
 
     print(f"{'=' * 50}\n")
+
+

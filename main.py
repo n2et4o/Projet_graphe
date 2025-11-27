@@ -1,5 +1,6 @@
 from Interface_utilisateur import *
 
+
 state = State()  # Crée un objet contenant les états
 
 # Boucle principale
@@ -11,6 +12,9 @@ while running:
         draw_help(screen, state)
     elif state.choosing_graphe:  # Affichage du choix du graphe
         draw_input_box(screen, state)
+
+    elif state.chosen_graphe is not None:  # menu du graphe
+        draw_menu(screen, state)
     else:
         draw_menu(screen, state)
 
@@ -28,9 +32,18 @@ while running:
                 if event.key == pygame.K_RETURN:
                     try:
                         state.chosen_graphe = int(state.input_text)
-                        if 1 <= state.chosen_graphe <= 44:
+                        if 0 <= state.chosen_graphe <= 13:
                             state.choosing_graphe = False
-                            fichier_test = f"graphe_projet/G{state.chosen_graphe}.txt"
+                            fichier_test = f"graphes_tests/G{state.chosen_graphe}.txt"
+                            print(f"Affichage du graphe {state.chosen_graphe}")
+                            nb = state.chosen_graphe
+                            Matrice, n, m, arcs = lire_graphe(fichier_test)
+                            historique = []
+                            chemins_log = []
+                            trace_execution_floyd(nb, n, m, arcs, Matrice, historique, chemins_log)
+                            afficher_matrice(Matrice)
+                            afficher_graphe_pygame(screen, n, m, arcs, Matrice,nb)
+
 
                             state.options = [
                                 "Afficher le graphe",
@@ -84,24 +97,38 @@ while running:
                         elif state.selected == 3:  # Quitter
                             running = False
 
-                    elif state.chosen_graphe is not None:  # Menu après choix d'un graphe
-                        if state.selected == 0:
-                            print(f"Affichage du graphe {state.chosen_graphe}")
+                    elif state.chosen_graphe is not None:
+                            if state.selected == 0:
+                                print(f"Affichage du graphe {state.chosen_graphe}")
+                                afficher_graphe_pygame(screen, n, m, arcs, Matrice,nb)
 
-                        elif state.selected == 1:
-                            print(f"floydification du graphe {state.chosen_graphe}")
-                            state.choosing_floydification = True
-                            state.selected = 0  # Réinitialisation pour afficher le graphe floydifier
-                        #elif state.selected == 2:
-                         #   print("Graphe Multiple") # Pour plustard lorsqu'on aura tout fait
+                            elif state.selected == 1:
+                                print(f"floydification du graphe {state.chosen_graphe}")
+                                # 1) Lancer Floyd sur la matrice
+                                historique, L, P, has_cycle = floyd(Matrice)
+                                afficher_floyd_pygame(screen, historique,has_cycle)
+                                # 2) Si pas de circuit absorbant, lancer l’interface Chemins
+                                if not has_cycle:
+                                    print("\n=== Interface Chemins ===")
+                                    # interface_chemins(L, P)
+                                    # liste vide : sera remplie par interface_chemins_pygame
+                                    interface_chemins_pygame(screen, L, P, chemins_log)
+                                else:
+                                    print("\nImpossible d'afficher les chemins : circuit absorbant détecté.")
 
-                        elif state.selected == 2:
-                            state.showing_help = True
-                        elif state.selected == 3:
-                            state.chosen_graphe = None
-                            state.options = ["Choisir un graphe", "Options", "Aide", "Quitter"]
-                        elif state.selected == 4:  # Quitter depuis le sous-menu
-                            running = False
+                                # Pour revenir au menu Pygame
+                                trace_execution_floyd(state.chosen_graphe, n, m, arcs, Matrice, historique, chemins_log)
+                                state.choosing_floydification = False
+                                state.selected = 0 # Réinitialisation pour afficher le graphe floydifier
+
+                            elif state.selected == 2:
+                                state.showing_help = True
+                            elif state.selected == 3:
+                                state.chosen_graphe = None
+                                state.showing_graph = False
+                                state.options = ["Choisir un graphe", "Options", "Aide", "Quitter"]
+                            elif state.selected == 4:  # Quitter depuis le sous-menu
+                                running = False
 
     state.clock.tick(60)  # Limite à 60 FPS
 
