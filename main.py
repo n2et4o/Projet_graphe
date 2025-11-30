@@ -34,7 +34,8 @@ while running:
                         state.chosen_graphe = int(state.input_text)
                         if 0 <= state.chosen_graphe <= 13:
                             state.choosing_graphe = False
-                            fichier_test = f"graphes_tests/G{state.chosen_graphe}.txt"
+                            # récupérer chemin correctement (EXE + IDE)
+                            fichier_test = (f"./graphes_tests/G{state.chosen_graphe}.txt")
                             print(f"Affichage du graphe {state.chosen_graphe}")
                             nb = state.chosen_graphe
                             Matrice, n, m, arcs = lire_graphe(fichier_test)
@@ -105,8 +106,8 @@ while running:
                             elif state.selected == 1:
                                 print(f"floydification du graphe {state.chosen_graphe}")
                                 # 1) Lancer Floyd sur la matrice
-                                historique, L, P, has_cycle = floyd(Matrice)
-                                afficher_floyd_pygame(screen, historique,has_cycle)
+                                historique, L, P, has_cycle, sommets_absorbants = floyd(Matrice)
+                                afficher_floyd_pygame(screen, historique,has_cycle,sommets_absorbants)
                                 # 2) Si pas de circuit absorbant, lancer l’interface Chemins
                                 if not has_cycle:
                                     print("\n=== Interface Chemins ===")
@@ -134,4 +135,5 @@ while running:
 
 
 pygame.quit()
-exit()
+sys.exit()
+

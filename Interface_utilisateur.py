@@ -1,10 +1,7 @@
-from fileinput import filename
-
 import pygame
 import time
 import random
 import io, contextlib
-import sys, os #pour intérargir avec syst d'exploitation - manipuler les répertoires et fichiers
 import re, pygame  # Importation du module pour manipuler les expressions régulières
 from graphe_fonctions import *
 
@@ -17,9 +14,9 @@ WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Projet Graphe - Algorithme de Floyd Warshall")
 
-# Charger les images de fond
+
 backgrounds = [
-    pygame.image.load("background/background1.png")
+    pygame.image.load(resource_path("background/background1.png"))
 ]
 backgrounds = [pygame.transform.scale(bg, (WIDTH, HEIGHT)) for bg in backgrounds]
 
@@ -139,7 +136,7 @@ def render_text_multiline(text, font, color, max_width):
 
 def draw_input_box(screen, state):
     # Liste dynamique des fichiers .txt dans le dossier graphes_Projet
-    dossier = "graphes_tests"
+    dossier = resource_path("graphes_tests")
     fichiers = [f for f in os.listdir(dossier) if f.endswith(".txt")]
     fichiers.sort()  # Optionnel : trie les fichiers
     total = len(fichiers)
@@ -147,7 +144,7 @@ def draw_input_box(screen, state):
     # Affichage de l'instruction dynamique
     screen.fill(state.current_background_color)
     if total > 0:
-        text = f"Entrez un numéro entre 0 et {total}:"
+        text = f"Entrez un numéro entre 0 et {total-1}:"
     elif total > 13:
         text = f"Le(s) fichier(s) que vous avez creer commence à partir de 0.\n Entrez un numéro entre 1 et {total}:"
     else:
@@ -278,18 +275,15 @@ def afficher_graphe_pygame(screen, n, m, arcs, matrice, nb):
         pygame.display.flip()
         clock.tick(60)
 
-def afficher_floyd_pygame(screen, historique, has_cycle):
+def afficher_floyd_pygame(screen, historique, has_cycle,sommets_absorbants):
     font = pygame.font.SysFont("consolas", 22)
     running = True
-
     index = 0           # index de l’étape affichée
     y_offset = 0        # scroll vertical
-
     go = False          # True => on affiche le message d’erreur
     # (et on n'affiche plus les matrices)
 
     while running:
-
         # ---------- 1) GESTION DES ÉVÉNEMENTS AVANT LE DESSIN ----------
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -338,10 +332,8 @@ def afficher_floyd_pygame(screen, historique, has_cycle):
         # Si on a demandé de quitter dans les events
         if not running:
             break
-
         # ---------- 2) DESSIN DE L'ÉCRAN ----------
         screen.fill((0, 0, 0))
-
         y = 20 + y_offset
 
         # Ligne info
@@ -354,7 +346,8 @@ def afficher_floyd_pygame(screen, historique, has_cycle):
 
         # --- MODE "MESSAGE D'ERREUR" SI CIRCUIT ABSORBANT ---
         if has_cycle and go:
-            msg = "Impossible d'afficher les chemins : circuit absorbant détecté."
+            msg = (f"Impossible d'afficher les chemins : circuit absorbant détecté. "
+                   f"\n-> Sommets impliqués : {sommets_absorbants}")
             for ligne in msg.split("\n"):
                 text = font.render(ligne, True, (255, 100, 100))
                 screen.blit(text, (20, y))
@@ -373,6 +366,7 @@ def afficher_floyd_pygame(screen, historique, has_cycle):
 
 def floyd(C):
     n = len(C)
+
     # Copie initiale de C dans L
     L = [[C[i][j] for j in range(n)] for i in range(n)]
 
@@ -385,19 +379,19 @@ def floyd(C):
             if i != j and C[i][j] != INF:
                 P[i][j] = i
 
-    # Ajouter l’état initial (L + P ensemble)
+    # Ajouter l’état initial
     texte = ""
     texte += afficher_matrice_text(L, "L (initial)") + "\n\n"
     texte += afficher_matrice_text(P, "P (initial)")
     historique.append(texte)
 
-    # État initial
     afficher_matrice(L, "L (initial)")
     afficher_matrice(P, "P (initial)")
 
     has_cycle = False
+    sommets_absorbants = []    # <<=== NOUVEAU
 
-    # Triple boucle de Floyd
+    # Triple boucle
     for k in range(n):
         for i in range(n):
             if L[i][k] == INF:
@@ -411,28 +405,28 @@ def floyd(C):
                     L[i][j] = cand
                     P[i][j] = P[k][j]
 
-        # Affichage intermédiaire après ce k
-        afficher_matrice(L, f"L après k = {k}")
-        afficher_matrice(P, f"P après k = {k}")
-
-        # Ajouter L + P pour cette étape
+        # Ajouter historique
         texte = ""
         texte += f"Étape k = {k}\n"
         texte += afficher_matrice_text(L, f"L après k = {k}") + "\n\n"
         texte += afficher_matrice_text(P, f"P après k = {k}")
         historique.append(texte)
 
-        # On regarde si un circuit absorbant apparaît
+        # Détection des cycles absorbants
         for i in range(n):
             if L[i][i] < 0:
                 has_cycle = True
+                if i not in sommets_absorbants:
+                    sommets_absorbants.append(i)     # <<=== NOUVEAU
 
+    # Affichage final
     if has_cycle:
-        print("\n Circuit absorbant détecté dans le graphe.")
+        print("\n Circuit absorbant détecté.")
+        print("-> Sommets impliqués :", sommets_absorbants)
     else:
         print("\n Aucun circuit absorbant détecté.")
 
-    return historique, L, P, has_cycle
+    return historique, L, P, has_cycle, sommets_absorbants
 
 def afficher_matrice_text(M, titre):
     lignes = []
@@ -496,11 +490,7 @@ def interface_chemins_pygame(screen, L, P,chemins_log):
                 y += 35
 
             screen.blit(font.render("ENTER : nouveau chemin | ESC : quitter", True, (200,200,0)), (20, y + 20))
-
         pygame.display.flip()
-
-
-
         # ----------------- GESTION CLAVIER -----------------
         for event in pygame.event.get():
 
